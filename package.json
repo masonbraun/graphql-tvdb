@@ -1,0 +1,28 @@
+{
+    "name": "graphql-tvdb",
+    "version": "1.0.0",
+    "description": "",
+    "main": "serve.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/masonbraun/graphql-tvdb.git"
+    },
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/masonbraun/graphql-tvdb/issues"
+    },
+    "homepage": "https://github.com/masonbraun/graphql-tvdb#readme",
+    "dependencies": {
+        "express": "^4.16.2",
+        "express-graphql": "^0.6.12",
+        "graphql": "^0.13.1",
+        "node-fetch": "^2.0.0",
+        "node-tvdb": "^4.0.0",
+        "util": "^0.10.3",
+        "xml2js": "^0.4.19"
+    }
+}
