@@ -1,0 +1,8 @@
+{
+    "title": "Caretaker",
+    "logs": [
+        "Captain's log, stardate 48315.6. We've traced the energy pulses from the array to the fifth planet of the neighboring system and believe they may have been used in some fashion to transport Kim and Torres to the planet's surface.",
+        "Captain's log, supplemental. The Maquis ship and Voyager have encountered a debris field where sensors have detected a small vessel. One humanoid lifeform is on board."
+    ],
+    "guests": ["Caretaker", "Jabin", "Adah"]
+}
