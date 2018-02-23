@@ -79,7 +79,6 @@ const SeriesType = new GraphQLObjectType({
                 season: { type: GraphQLInt }
             },
             resolve: (root, args) => {
-                console.log(root);
                 return root.episodes.filter(
                     episode => episode.airedSeason === args.season
                 );
@@ -110,6 +109,12 @@ const EpisodeType = new GraphQLObjectType({
             type: GraphQLString,
             resolve: xml => xml.overview
         },
+        production: {
+            type: GraphQLString,
+            resolve: xml => {
+                return xml.overview;
+            }
+        },
         stardate: {
             type: GraphQLFloat,
             resolve: xml =>
@@ -127,6 +132,16 @@ const EpisodeType = new GraphQLObjectType({
                     .getEpisodeById(xml.id)
                     .then(response => {
                         return response.filename;
+                    })
+                    .catch(error => {})
+        },
+        production_code: {
+            type: GraphQLString,
+            resolve: xml =>
+                tvdb
+                    .getEpisodeById(xml.id)
+                    .then(response => {
+                        return response.productionCode;
                     })
                     .catch(error => {})
         }
@@ -148,6 +163,7 @@ module.exports = new GraphQLSchema({
                     tvdb
                         .getSeriesAllById(args.id)
                         .then(response => {
+                            // console.log(response);
                             return response;
                         })
                         .catch(error => {})
