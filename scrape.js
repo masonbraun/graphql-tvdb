@@ -1,10 +1,25 @@
 const express = require('express');
 const fs = require('fs');
 const request = require('request');
-const cheerio = require('cheerio');
+let cheerio = require('cheerio');
+const cheerioAdv = require('cheerio-advanced-selectors');
 const winston = require('winston');
 var Promise = require('promise');
+const download = require('image-downloader');
+var cloudinary = require('cloudinary');
 const app = express();
+
+cloudinary.config({
+  cloud_name: 'dyaurodrv',
+  api_key: '739425384736328',
+  api_secret: '2rXoi5b4SswR6vwjcN7ZCTvP6bY'
+});
+
+// cloudinary.uploader.upload('https://vignette.wikia.nocookie.net/memoryalpha/images/b/b0/Forest_of_Forever.jpg/revision/latest?cb=20070930202049&path-prefix=en', function(result) {
+//   console.log(result);
+// });
+
+cheerio = cheerioAdv.wrap(cheerio);
 
 const logger = new winston.Logger({
   transports: [
@@ -15,6 +30,18 @@ const logger = new winston.Logger({
     })
   ]
 });
+
+// download
+//   .image({
+//     url: 'https://vignette.wikia.nocookie.net/memoryalpha/images/0/02/1x10_Prime_Factors_title_card.jpg/revision/latest?cb=20160711010658&path-prefix=en',
+//     dest: '/Users/braunm/Downloads/image.jpg'
+//   })
+//   .then(({ filename, image }) => {
+//     console.log('File saved to', filename);
+//   })
+//   .catch(err => {
+//     throw err;
+//   });
 
 const doEverything = async () => {
   let links = await getEpisodeLinks();
@@ -46,11 +73,34 @@ const getEpisodeData = link => {
         let code = $('.portable-infobox div:nth-child(3)')
           .text()
           .trim();
-        let production_code = code.replace('Production number:', '').trim();
+        let production_code = Number(code.replace('Production number:', '').trim());
+
+        let dates = $('nav.pi-navigation')
+          .text()
+          .split(' ');
+
+        let starDate = parseFloat(dates[0].trim());
+        let earthDate = Number(dates[1].replace(/[()]/g, ''));
+
+        let titleCard = $('figure.pi-image:eq(1) a img')
+          .attr('src')
+          .replace('/scale-to-width-down/350', '');
+
+        let episodeImage = $('figure.pi-image:eq(0) a img')
+          .attr('src')
+          .replace('/scale-to-width-down/350', '');
 
         var json = {
           production_code: production_code,
           title: title,
+          dates: {
+            star: starDate,
+            earth: earthDate
+          },
+          images: {
+            titleCard: titleCard,
+            episodeImage: episodeImage
+          },
           logs: [],
           characters: {
             main: [],
@@ -113,9 +163,7 @@ const getEpisodeData = link => {
           .each(function(i, e) {
             let character = $(this)
               .text()
-              // .replace(/["]+/g, '')
-              // .replace(/\n/g, ' ')
-
+              .replace(/['"]+/g, '')
               .trim();
             // console.log(character.children());
 
@@ -132,6 +180,7 @@ const getEpisodeData = link => {
 
             json.quotes.push(quote);
           });
+
         // always end here
         // console.log(json);
         resolve(json);
@@ -180,11 +229,34 @@ const getSingleEpisodeData = link => {
       let code = $('.portable-infobox div:nth-child(3)')
         .text()
         .trim();
-      let production_code = code.replace('Production number:', '').trim();
+      let production_code = Number(code.replace('Production number:', '').trim());
+
+      let dates = $('nav.pi-navigation')
+        .text()
+        .split(' ');
+
+      let starDate = parseFloat(dates[0].trim());
+      let earthDate = Number(dates[1].replace(/[()]/g, ''));
+
+      let titleCard = $('figure.pi-image:eq(1) a img')
+        .attr('src')
+        .replace('/scale-to-width-down/350', '');
+
+      let episodeImage = $('figure.pi-image:eq(0) a img')
+        .attr('src')
+        .replace('/scale-to-width-down/350', '');
 
       var json = {
         production_code: production_code,
         title: title,
+        dates: {
+          star: starDate,
+          earth: earthDate
+        },
+        images: {
+          titleCard: titleCard,
+          episodeImage: episodeImage
+        },
         logs: [],
         characters: {
           main: [],
@@ -265,9 +337,8 @@ const getSingleEpisodeData = link => {
           json.quotes.push(quote);
         });
 
-      // console.log(quotes.html());
-
       //end
+
       console.log(json);
     }
   });
@@ -279,88 +350,8 @@ const writeFile = json => {
   });
 };
 
-// getSingleEpisodeData();
-doEverything();
-
-// logger.log("test", { test: "werwer", asdfsdf: 2342 });
-
-// app.get('/scrape', function(req, res) {
-//   url = 'http://memory-alpha.wikia.com/wiki/Caretaker_(episode)';
-//   request(url, function(error, response, html) {
-//     if (!error) {
-//       var $ = cheerio.load(html);
-//       console.log($('.pi-title').text());
-//       let clean = text => text.replace(/"/g, '').replace(/\n/g, '');
-//       var title, release, rating;
-//       var json = {
-//         title: $('.pi-title')
-//           .text()
-//           .replace(/"/g, ''),
-//         logs: [],
-//         guests: []
-//       };
-//       let logs = $('#Log_entries')
-//         .closest('h2')
-//         .next('ul')
-//         .children()
-//         .each(function(i, e) {
-//           json.logs.push(clean($(this).text()));
-//           // console.log($(this).text());
-//         });
-//       let guests = $('#Guest_stars')
-//         .closest('h3')
-//         .next('ul')
-//         .children()
-//         // .last()
-//         .each(function(i, e) {
-//           json.guests.push(
-//             clean(
-//               $(this)
-//                 .children()
-//                 .last()
-//                 .text()
-//             )
-//           );
-//           // console.log(
-//           //     $(this)
-//           //         .children()
-//           //         .last()
-//           //         .text()
-//           // );
-//         });
-//       // console.log(guests);
-//       // $(".header").filter(function() {
-//       //     var data = $(this);
-//       //     title = data
-//       //         .children()
-//       //         .first()
-//       //         .text();
-//       //     release = data
-//       //         .children()
-//       //         .last()
-//       //         .children()
-//       //         .text();
-//       //     json.title = title;
-//       //     json.release = release;
-//       // });
-//       // $(".star-box-giga-star").filter(function() {
-//       //     var data = $(this);
-//       //     rating = data.text();
-//       //     json.rating = rating;
-//       // });
-//     }
-//     // To write to the system we will use the built in 'fs' library.
-//     // In this example we will pass 3 parameters to the writeFile function
-//     // Parameter 1 :  output.json - this is what the created filename will be called
-//     // Parameter 2 :  JSON.stringify(json, null, 4) - the data to write, here we do an extra step by calling JSON.stringify to make our JSON easier to read
-//     // Parameter 3 :  callback function - a callback function to let us know the status of our function
-//     fs.writeFile('output.json', JSON.stringify(json, null, 4), function(err) {
-//       console.log('File successfully written! - Check your project directory for the output.json file');
-//     });
-//     // Finally, we'll just send out a message to the browser reminding you that this app does not have a UI.
-//     res.send('Check your console!');
-//   });
-// });
+getSingleEpisodeData();
+// doEverything();
 
 app.listen('8081');
 logger.log('Magic happens on port 8081');

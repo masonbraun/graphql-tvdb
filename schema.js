@@ -2,69 +2,46 @@ const fetch = require('node-fetch');
 const util = require('util');
 const parseXML = util.promisify(require('xml2js').parseString);
 const { GraphQLSchema, GraphQLObjectType, GraphQLInt, GraphQLString, GraphQLList, GraphQLFloat } = require('graphql');
-
+const DataLoader = require('dataloader');
 const trek = require('./trek.js').trek;
-
-console.log(trek.trek);
 
 const TVDB = require('node-tvdb');
 const tvdb = new TVDB('0BCF6724EEDAB59C');
 
-const Post = new GraphQLObjectType({
-  name: 'Post',
-  description: '...',
+const getSeriesById = id => {
+  return tvdb
+    .getSeriesAllById(id)
+    .then(response => response)
+    .catch(error => {});
+};
 
-  fields: () => ({
-    title: {
-      type: GraphQLString,
-      resolve: xml => xml.title
-    },
-    body: {
-      type: GraphQLString,
-      resolve: xml => xml.body
-    }
-  })
+const getEpisodeById = id => {
+  return tvdb
+    .getEpisodeById(id)
+    .then(response => response)
+    .catch(error => {});
+};
+
+const seriesLoader = new DataLoader(keys => {
+  console.log(keys);
+  return Promise.all(keys.map(key => getSeriesById(key)));
 });
 
-const BookType = new GraphQLObjectType({
-  name: 'Book',
-  description: '...',
-
-  fields: () => ({
-    title: {
-      type: GraphQLString,
-      resolve: xml => xml.title[0]
-    },
-    isbn: {
-      type: GraphQLString,
-      resolve: xml => xml.isbn[0]
-    }
-  })
+const episodeLoader = new DataLoader(keys => {
+  console.log(keys);
+  return Promise.all(keys.map(key => getEpisodeById(key)));
 });
 
-const AuthorType = new GraphQLObjectType({
-  name: 'Author',
-  description: '...',
-
-  fields: () => ({
-    // name: {
-    //     type: GraphQLString,
-    //     resolve: xml => xml.GoodreadsResponse.author[0].name[0]
-    // },
-    books: {
-      type: new GraphQLList(BookType),
-      resolve: xml => {
-        console.log(xml);
-        // xml.GoodreadsResponse.author[0].books[0].book
-      }
-    }
-  })
-});
+const crossReference = id => {
+  return new Promise(async resolve => {
+    let remoteEpisode = await episodeLoader.load(id);
+    let localEpisode = trek.filter(word => word.production_code == remoteEpisode.productionCode);
+    resolve(localEpisode[0]);
+  });
+};
 
 const SeriesType = new GraphQLObjectType({
   name: 'Series',
-  description: '...',
-
   fields: () => ({
     name: {
       type: GraphQLString,
@@ -77,7 +54,6 @@ const SeriesType = new GraphQLObjectType({
       },
       resolve: (root, args) => {
         return root.episodes.filter(episode => episode.airedSeason === args.season);
-        // return xml.episodes;
       }
     }
   })
@@ -90,70 +66,107 @@ const EpisodeType = new GraphQLObjectType({
   fields: () => ({
     name: {
       type: GraphQLString,
-      resolve: xml => xml.episodeName
+      resolve: data => data.episodeName
     },
     season: {
       type: GraphQLInt,
-      resolve: xml => xml.airedSeason
+      resolve: data => data.airedSeason
     },
-
     number: {
       type: GraphQLInt,
-      resolve: xml => xml.airedEpisodeNumber
+      resolve: data => data.airedEpisodeNumber
     },
     synposis: {
       type: GraphQLString,
-      resolve: xml => xml.overview
-    },
-    production: {
-      type: GraphQLString,
-      resolve: xml => {
-        return xml.overview;
-      }
-    },
-    stardate: {
-      type: GraphQLFloat,
-      resolve: xml =>
-        Number(
-          xml.overview
-            .split('\r\n', 1)[0]
-            .split('Stardate:')[1]
-            .trim()
-        )
-    },
-    thumbnail: {
-      type: GraphQLString,
-      resolve: xml =>
-        tvdb
-          .getEpisodeById(xml.id)
-          .then(response => {
-            return response.filename;
-          })
-          .catch(error => {})
+      resolve: data => data.overview
     },
     production_code: {
-      type: GraphQLString,
-      resolve: xml =>
-        tvdb
-          .getEpisodeById(xml.id)
-          .then(response => {
-            return response.productionCode;
-          })
-          .catch(error => {})
+      type: GraphQLInt,
+      resolve: async data => {
+        let episode = await episodeLoader.load(data.id);
+        console.log(episode);
+        return Number(episode.productionCode);
+      }
     },
     logs: {
       type: new GraphQLList(GraphQLString),
-      resolve: xml =>
-        tvdb
-          .getEpisodeById(xml.id)
-          .then(response => {
-            return response.productionCode;
-          })
-          .then(code => {
-            let sup = trek.filter(word => word.production_code == code);
-            return sup[0].logs;
-          })
-          .catch(error => {})
+      resolve: async data => {
+        let episode = await crossReference(data.id);
+        return episode.logs;
+      }
+    },
+    dates: {
+      type: DatesType,
+      resolve: async data => {
+        let episode = await crossReference(data.id);
+        return episode.dates;
+      }
+    },
+    characters: {
+      type: CharactersType,
+      resolve: async data => {
+        let episode = await crossReference(data.id);
+        return episode.characters;
+      }
+    },
+    images: {
+      type: ImagesType,
+      resolve: async data => {
+        let episode = await episodeLoader.load(data.id);
+        return episode;
+      }
+    }
+  })
+});
+
+const DatesType = new GraphQLObjectType({
+  name: 'Dates',
+  fields: () => ({
+    earth: {
+      type: GraphQLInt,
+      resolve: dates => dates.earth
+    },
+    star: {
+      type: GraphQLFloat,
+      resolve: dates => dates.star
+    }
+  })
+});
+
+const CharactersType = new GraphQLObjectType({
+  name: 'Characters',
+  fields: () => ({
+    main: {
+      type: new GraphQLList(GraphQLString),
+      resolve: characters => characters.main
+    },
+    guests: {
+      type: new GraphQLList(GraphQLString),
+      resolve: characters => characters.guests
+    }
+  })
+});
+
+const ImagesType = new GraphQLObjectType({
+  name: 'Images',
+  fields: () => ({
+    thumbnail: {
+      type: GraphQLString,
+      resolve: episode => `https://www.thetvdb.com/banners/${episode.filename}`
+    },
+    title: {
+      type: GraphQLString,
+      resolve: async data => {
+        let episode = await crossReference(data.id);
+        return episode.images.titleCard;
+      }
+    },
+    wassup: {
+      type: GraphQLString,
+      resolve: async data => {
+        let episode = await crossReference(data.id);
+        return episode.images.episodeImage;
+      }
     }
   })
 });
@@ -169,14 +182,9 @@ module.exports = new GraphQLSchema({
         args: {
           id: { type: GraphQLInt }
         },
-        resolve: (root, args) =>
-          tvdb
-            .getSeriesAllById(args.id)
-            .then(response => {
-              // console.log(response);
-              return response;
-            })
-            .catch(error => {})
+        resolve: async (root, args) => {
+          return await seriesLoader.load(args.id);
+        }
       }
     })
   })
